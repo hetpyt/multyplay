@@ -4,15 +4,11 @@ from pygame.locals import *
 import tkinter as TK
 from tkinter.filedialog import askopenfilename
 
-def play():
-    s1 = pygame.mixer.Sound(file="./test/1.mp3")
-    s1.set_volume(0.2)
-    s1.play()
-
 class Player(TK.Frame):
     def __init__(self, parent, **kwargs):
         super().__init__(parent, borderwidth = 3, relief = TK.RIDGE) 
         self.__parent = parent
+        self.__pg_mixer = kwargs.get('pygame_mixer', None)
 
         self.volume = 0.5
         self.paused = False
@@ -21,7 +17,7 @@ class Player(TK.Frame):
 
         self.channelId = kwargs.get('channel_id', None)
         if (self.channelId == None): return None
-        self.channel = pygame.mixer.Channel(self.channelId)
+        self.channel = self.__pg_mixer.Channel(self.channelId)
 
         self.btnPlay = TK.Button(self, text = '>', command = self.btnPlay_on_click)
         self.btnPlay.pack(side = TK.LEFT, padx = 2, pady = 1)
@@ -64,14 +60,22 @@ class Player(TK.Frame):
             self.fileName = fn
             self.fldFileName_set(self.fileName)
             self.stop() 
-            self.sound = pygame.mixer.Sound(file = self.fileName)
+            self.sound = self.__pg_mixer.Sound(file = self.fileName)
 
     def play(self):
         if (self.sound and not self.channel.get_busy()):
             self.channel.play(self.sound) #, fade_ms = self.fadein_ms)
             self.channel.set_volume(self.volume)
             self.paused = False
-            
+
+    def pause(self):
+        if (self.paused): 
+            self.channel.unpause()
+            self.paused = False
+        else:
+            self.channel.pause()
+            self.paused = True
+
     def stop(self):
         if (self.channel.get_busy()):
             self.channel.fadeout(self.__parent.get_fadeout())
@@ -93,13 +97,8 @@ class Player(TK.Frame):
         self.play()
 
     def btnPause_on_click(self):
-        if (self.paused): 
-            self.channel.unpause()
-            self.paused = False
-        else:
-            self.channel.pause()
-            self.paused = True
-
+        self.pause()
+        
     def btnStop_on_click(self):
         self.stop()
 
@@ -111,8 +110,10 @@ class Player(TK.Frame):
 
 class PlayerList(TK.Frame):
     def __init__(self, parent, **kwargs):
-        super().__init__(parent, relief = TK.SUNKEN, borderwidth = 3) #, width = self.canvas_width, height = self.canvas_height)
-        self.parent = parent
+        super().__init__(parent, relief = TK.SUNKEN, borderwidth = 3) 
+
+        self.__pg_mixer = kwargs.get('pygame_mixer', None)
+        self.__parent = parent
         self.__next_channel_id = 0
         self.__fadeout_ms = 500
         self.__fadein_ms = 500
@@ -127,11 +128,9 @@ class PlayerList(TK.Frame):
         self.sclFadeout.pack(side = TK.LEFT, padx = 3, pady = 1)
         self.sclFadeout.set(self.__fadeout_ms)
 
-        self.tick()
+        self.fill_players()
 
-    def init(self):
-        #self.set_players_volume()
-        pass
+        self.tick()
 
     def tick(self):
         for pl in self.__players:
@@ -141,16 +140,9 @@ class PlayerList(TK.Frame):
     def get_fadeout(self):
         return self.__fadeout_ms
 
-    def next_channel(self):
-        result = self.__next_channel_id
-        self.__next_channel_id += 1
-        if (self.__next_channel_id >= pygame.mixer.get_num_channels()):
-            self.__next_channel_id = None
-        return result
-
     def fill_players(self):
-        for i in range(pygame.mixer.get_num_channels()):
-            pl = Player(self, channel_id = self.next_channel())
+        for i in range(self.__pg_mixer.get_num_channels()):
+            pl = Player(self, pygame_mixer = self.__pg_mixer, channel_id = i)
             pl.pack(side = TK.BOTTOM)
             self.__players.append(pl)
 
@@ -162,17 +154,13 @@ class PlayerList(TK.Frame):
         self.__fadeout_ms = int(value)
 
 def main():
-    pygame.init()
+    pygame.mixer.init()
     print('channels=', pygame.mixer.get_num_channels())
     root = TK.Tk()
-    #play()
-    plList = PlayerList(root)
+    plList = PlayerList(root, pygame_mixer = pygame.mixer)
     plList.pack()
-    plList.fill_players()
-    plList.init()
 
     root.mainloop()
-
 
 if __name__ == '__main__':
     main()
