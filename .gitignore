@@ -1,0 +1,9 @@
+# Logs
+logs
+*.log
+# trest
+test
+# Optional npm cache directory
+/.vscode
+.vscode
+.idea
