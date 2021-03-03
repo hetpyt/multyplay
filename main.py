@@ -43,6 +43,8 @@ class Player(TK.Frame):
         #self.btnStop.bind('<Button-1>', self.btnStop_on_click)
         #self.btnOpen.bind('<Button-1>', self.btnStop_on_click)
 
+    def get_id(self):
+        return self.channelId
 
     def on_tick(self):
         #print("on_tick id=", self.channelId)
@@ -63,18 +65,30 @@ class Player(TK.Frame):
             self.sound = self.__pg_mixer.Sound(file = self.fileName)
 
     def play(self):
-        if (self.sound and not self.channel.get_busy()):
+        if (self.sound):
+            # pause all other channels
+            self.__parent.pause_all(self.channelId)
             self.channel.play(self.sound) #, fade_ms = self.fadein_ms)
             self.channel.set_volume(self.volume)
             self.paused = False
 
     def pause(self):
-        if (self.paused): 
-            self.channel.unpause()
-            self.paused = False
-        else:
+        if (self.is_playing() and not self.paused):
             self.channel.pause()
             self.paused = True
+
+    def unpause(self):
+        if (self.is_playing() and self.paused):
+            # pause all other channel
+            self.__parent.pause_all(self.channelId)
+            self.channel.unpause()
+            self.paused = False
+
+    def togle_pause(self):
+        if (self.paused): 
+            self.unpause()
+        else:
+            self.pause()
 
     def stop(self):
         if (self.channel.get_busy()):
@@ -97,7 +111,7 @@ class Player(TK.Frame):
         self.play()
 
     def btnPause_on_click(self):
-        self.pause()
+        self.togle_pause()
         
     def btnStop_on_click(self):
         self.stop()
@@ -107,6 +121,7 @@ class Player(TK.Frame):
 
     def sclVol_change(self, value):
         self.set_volume(float(value))
+
 
 class PlayerList(TK.Frame):
     def __init__(self, parent, **kwargs):
@@ -135,10 +150,20 @@ class PlayerList(TK.Frame):
     def tick(self):
         for pl in self.__players:
             pl.on_tick()
-        self.after(200, self.tick)
+        self.after(100, self.tick)
 
     def get_fadeout(self):
         return self.__fadeout_ms
+
+    def stop_all(self, exclude_id = None):
+        for pl in self.__players:
+            if (exclude_id != pl.get_id()):
+                pl.stop()
+
+    def pause_all(self, exclude_id = None):
+        for pl in self.__players:
+            if (exclude_id != pl.get_id()):
+                pl.pause()
 
     def fill_players(self):
         for i in range(self.__pg_mixer.get_num_channels()):
